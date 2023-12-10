@@ -1,15 +1,19 @@
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Autocomplete, Box, InputAdornment, Stack, TextField } from "@mui/material"
-import { useEffect, useMemo, useState } from "react"
 
-function Input({ isDisabled, error, currencies, selected, initAmount, onChangeAmount, isFrom, isTo, onChangeCurrency }) {
+function Input({ isDisabled, error, currencies, selected, initAmount, onChangeAmount, isFrom, onChangeCurrency }) {
     const [inputError, setInputError] = useState(null)
+    const [inputValue, setInputValue] = useState(initAmount)
+
+    const debounceRef = useRef(null)
+
+    useEffect(() => {
+        setInputValue(initAmount)
+    }, [initAmount])
 
     useEffect(() => {
         setInputError(error)
-
     }, [JSON.stringify(error)])
-
-    const stringifiedArray = JSON.stringify(currencies)
 
     const options = useMemo(() => {
         const arrayWithoutDuplicate = currencies?.filter((value, index, originalArr) =>
@@ -17,7 +21,7 @@ function Input({ isDisabled, error, currencies, selected, initAmount, onChangeAm
                 t.currency === value.currency
             )))
         return arrayWithoutDuplicate
-    }, [stringifiedArray])
+    }, [JSON.stringify(currencies)])
 
     const getTokenIconPath = (currency) => {
         try {
@@ -27,18 +31,19 @@ function Input({ isDisabled, error, currencies, selected, initAmount, onChangeAm
         }
     }
 
-    const handleChangeAmount = (value) => {
-        let amount
-        if (value.length === 0) {
-            amount = 0
-        } else amount = parseFloat(value)
+    const handleChangeAmountDebounce = (value) => {
+        if (debounceRef.current) clearTimeout(debounceRef.current)
 
+        let amount = parseFloat(value || 0)
         if (amount < 0) {
             setInputError({ message: 'Invalid input' })
             return
         } else setInputError(null)
+        setInputValue(amount.toString())
 
-        onChangeAmount(amount)
+        debounceRef.current = setTimeout(() => {
+            onChangeAmount(amount)
+        }, 500)
     }
     return (
         <Stack
@@ -59,8 +64,8 @@ function Input({ isDisabled, error, currencies, selected, initAmount, onChangeAm
                     helperText={inputError?.message}
                     id="standard-basic"
                     label={isFrom ? 'You want to swap' : 'You will get'}
-                    value={initAmount}
-                    onChange={(e) => handleChangeAmount(e.target.value)}
+                    value={inputValue}
+                    onChange={(e) => handleChangeAmountDebounce(e.target.value)}
                     type="number"
                     variant="standard" />
             </div>

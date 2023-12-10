@@ -1,22 +1,27 @@
 import { useEffect, useRef, useState } from "react"
-import axios from 'axios'
-
-import Input from "./Input"
-
 import { Alert, Box, Button, Snackbar, Stack, Typography } from "@mui/material"
 import SwapHorizontalCircleRoundedIcon from '@mui/icons-material/SwapHorizontalCircleRounded'
 import ArrowCircleRightOutlinedIcon from '@mui/icons-material/ArrowCircleRightOutlined'
+import axios from 'axios'
+
+import Input from "./Input"
 import PriceChart from "./PriceChart"
 
+
 function SwapForm() {
-    const [currencyOptions, setCurrencyOptions] = useState([])
-    const [fromCurrency, setFromCurrency] = useState(null)
-    const [toCurrency, setToCurrency] = useState(null)
-    const [amountFrom, setAmountFrom] = useState(0)
-    const [amountTo, setAmountTo] = useState(0)
     const [error, setError] = useState(null)
+    const [currencyOptions, setCurrencyOptions] = useState([])
+    const [choosenCurrencies, setChoosenCurrencies] = useState({
+        fromCurrency: null,
+        toCurrency: null
+    })
+    const [selectedAmount, setSelectedAmount] = useState({
+        fromAmount: 0,
+        toAmount: 0
+    })
 
     const [isHover, setIsHover] = useState(false)
+    const [isSwapped, setIsSwapped] = useState(false)
     const [showToast, setShowToast] = useState(false)
     const [isConverting, setIsConverting] = useState(false)
 
@@ -24,12 +29,15 @@ function SwapForm() {
     const rightCardRef = useRef(null)
     const timeoutRef = useRef(null)
 
+    //we can also create useCurrency hook if it can re-use in other places
     useEffect(() => {
         axios.get('https://interview.switcheo.com/prices.json')
             .then(res => {
                 setCurrencyOptions(res.data)
-                setFromCurrency(res.data[0])
-                setToCurrency(res.data[4])
+                setChoosenCurrencies({
+                    fromCurrency: res.data[0],
+                    toCurrency: res.data[4]
+                })
             })
 
             .catch(err => { throw Error(`${err}`) })
@@ -37,81 +45,61 @@ function SwapForm() {
     }, [])
 
     useEffect(() => {
-        if (amountFrom === 0) {
-            setAmountTo(0)
-            return
-        }
-
-        let newAmount = amountFrom * fromCurrency?.price / toCurrency?.price
-        setAmountTo(newAmount.toFixed(newAmount.toFixed(8) > Math.floor(newAmount) ? 8 : 0))
-    }, [fromCurrency?.currency])
+        isSwapped ? setIsSwapped(false) : handleChangeAmount('fromAmount')(selectedAmount.fromAmount)
+    }, [choosenCurrencies.fromCurrency?.currency])
 
     useEffect(() => {
-        if (amountTo === 0) {
-            setAmountFrom(0)
-            return
-        }
+        isSwapped ? setIsSwapped(false) : handleChangeAmount('toAmount')(selectedAmount.toAmount)
+    }, [choosenCurrencies.toCurrency?.currency])
 
-        let newAmount = amountTo * toCurrency?.price / fromCurrency?.price
-        setAmountFrom(newAmount.toFixed(newAmount.toFixed(8) > Math.floor(newAmount) ? 8 : 0))
-    }, [toCurrency?.currency])
-
-
-    const handleChangeFromCurrency = (currency) => {
-        setFromCurrency(currency)
+    //currying function
+    const handleChangeChoosenCurrencies = (currencyKey) => (currencyData) => {
+        setChoosenCurrencies(prev => ({
+            ...prev,
+            [currencyKey]: currencyData
+        }))
     }
 
-    const handleChangeToCurrency = (currency) => {
-        setToCurrency(currency)
-    }
-
-    const handleChangeAmountFrom = (amount) => {
+    const handleChangeAmount = (amountKey) => (amount) => {
         if (amount < 0) {
             return
         }
         setError(null)
-        setAmountFrom(amount)
-        if (!toCurrency || !fromCurrency) return
-        setAmountTo((amount * fromCurrency.price / toCurrency.price).toFixed(amount === 0 ? 0 : 8))
-    }
-
-    const handleChangeAmountTo = (amount) => {
-        if (amount < 0) {
-            return
+        if (!choosenCurrencies.toCurrency || !choosenCurrencies.fromCurrency) return
+        if (amountKey === 'fromAmount') {
+            setSelectedAmount(({
+                [amountKey]: amount,
+                toAmount: parseFloat((amount * choosenCurrencies.fromCurrency.price / choosenCurrencies.toCurrency.price).toFixed(amount === 0 ? 0 : 8)),
+            }))
+        } else {
+            setSelectedAmount(({
+                fromAmount: parseFloat((amount * choosenCurrencies.toCurrency.price / choosenCurrencies.fromCurrency.price).toFixed(amount === 0 ? 0 : 8)),
+                [amountKey]: amount
+            }))
         }
-        setError(null)
-        setAmountTo(amount)
-
-        if (!toCurrency || !fromCurrency) return
-        setAmountFrom((amount * toCurrency.price / fromCurrency.price).toFixed(amount === 0 ? 0 : 8))
     }
 
     const handleSwapSide = () => {
+        setIsSwapped(true)
         leftCardRef.current.classList.add('firstCardSwap')
         rightCardRef.current.classList.add('secondCardSwap')
-        let amountFromState = { token: fromCurrency, amount: amountFrom }
-        let amountToState = { token: toCurrency, amount: amountTo }
         timeoutRef.current = setTimeout(() => {
-            setAmountFrom(amountToState.amount)
-            setAmountTo(amountFromState.amount)
-            setFromCurrency(amountToState.token)
-            setToCurrency(amountFromState.token)
+            setSelectedAmount(prev => ({
+                fromAmount: prev.toAmount,
+                toAmount: prev.fromAmount
+            }))
+            setChoosenCurrencies(prev => ({
+                fromCurrency: prev.toCurrency,
+                toCurrency: prev.fromCurrency
+            }))
             leftCardRef.current.classList.remove('firstCardSwap')
             rightCardRef.current.classList.remove('secondCardSwap')
             clearTimeout(timeoutRef.current)
         }, 900)
     }
 
-    const handleSwapBtn = (isHover) => {
-        setIsHover(isHover)
-    }
-
-    const handleCloseToast = () => {
-        setShowToast(false)
-    }
-
     const handleConvertCurrency = () => {
-        if (amountFrom === 0) {
+        if (selectedAmount.fromAmount === 0) {
             setError({ message: 'Please enter!', slot: 'amountFrom' })
             return
         }
@@ -119,9 +107,11 @@ function SwapForm() {
         setIsConverting(true)
         const timeout = setTimeout(() => {
             setShowToast(true)
+            setSelectedAmount({
+                fromAmount: 0,
+                toAmount: 0
+            })
             setIsConverting(false)
-            setAmountFrom(0)
-            setAmountTo(0)
             clearTimeout(timeout)
         }, 3000)
     }
@@ -138,9 +128,9 @@ function SwapForm() {
                 borderRadius: '12px'
             }} className="form_wrapper">
                 <Box sx={{ width: '100%', textAlign: 'center', marginBottom: '10px' }}>
-                    {!fromCurrency || !toCurrency ? 'Loading' :
+                    {!choosenCurrencies.fromCurrency || !choosenCurrencies.toCurrency ? 'Loading' :
                         <Typography sx={{ color: '#f5a623', fontSize: '18px' }}>
-                            1 {fromCurrency?.currency} = {`${(fromCurrency?.price / toCurrency?.price).toFixed(8)}`} {toCurrency?.currency}
+                            1 {choosenCurrencies.fromCurrency?.currency} = {`${(choosenCurrencies.fromCurrency?.price / choosenCurrencies.toCurrency?.price).toFixed(8)}`} {choosenCurrencies.toCurrency?.currency}
                         </Typography>}
                 </Box>
                 <Stack direction={{ xs: 'column', sm: 'column', md: 'row', lg: 'row' }} sx={{
@@ -152,11 +142,11 @@ function SwapForm() {
                             isDisabled={isConverting}
                             error={error}
                             currencies={currencyOptions}
-                            selected={fromCurrency}
+                            selected={choosenCurrencies.fromCurrency}
                             isFrom
-                            initAmount={amountFrom.toString()}
-                            onChangeAmount={handleChangeAmountFrom}
-                            onChangeCurrency={handleChangeFromCurrency} />
+                            initAmount={selectedAmount.fromAmount}
+                            onChangeAmount={handleChangeAmount('fromAmount')}
+                            onChangeCurrency={handleChangeChoosenCurrencies('fromCurrency')} />
                     </div>
                     <Box
                         sx={{
@@ -169,8 +159,8 @@ function SwapForm() {
                             transform: { xs: 'rotate(90deg)', sm: 'rotate(90deg)', md: 'rotate(0deg)' }
                         }}
                         onClick={handleSwapSide}
-                        onMouseEnter={() => handleSwapBtn(true)}
-                        onMouseLeave={() => handleSwapBtn(false)}>
+                        onMouseEnter={() => setIsHover(true)}
+                        onMouseLeave={() => setIsHover(false)}>
                         {!isHover ? <ArrowCircleRightOutlinedIcon className='swap' sx={{
                             fontSize: { xs: '40px', sm: '42px', md: '52px', lg: '56px' },
                             color: "#f5a623",
@@ -191,10 +181,10 @@ function SwapForm() {
                             isDisabled={isConverting}
                             error={error}
                             currencies={currencyOptions}
-                            selected={toCurrency}
-                            initAmount={amountTo.toString()}
-                            onChangeAmount={handleChangeAmountTo}
-                            onChangeCurrency={handleChangeToCurrency} />
+                            selected={choosenCurrencies.toCurrency}
+                            initAmount={selectedAmount.toAmount}
+                            onChangeAmount={handleChangeAmount('toAmount')}
+                            onChangeCurrency={handleChangeChoosenCurrencies('toCurrency')} />
                     </div>
                 </Stack>
                 <Box sx={{ marginTop: '26px', width: '100%', display: "flex", justifyContent: 'center' }}>
@@ -234,11 +224,11 @@ function SwapForm() {
                     </Button>}
                 </Box>
             </Box>
-            <PriceChart from={fromCurrency} to={toCurrency} />
+            <PriceChart from={choosenCurrencies.fromCurrency} to={choosenCurrencies.toCurrency} />
             <Snackbar
                 anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-                open={showToast} autoHideDuration={5000} onClose={handleCloseToast}>
-                <Alert onClose={handleCloseToast} severity="success" sx={{ width: '100%' }}>
+                open={showToast} autoHideDuration={5000} onClose={() => setShowToast(false)}>
+                <Alert onClose={() => setShowToast(false)} severity="success" sx={{ width: '100%' }}>
                     Trade successfully!
                 </Alert>
             </Snackbar>

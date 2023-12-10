@@ -4,9 +4,9 @@
   position: relative;
   z-index: 0;
   padding: 36px;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden auto;
+  /* width: 100vw;
+  height: 100vh; */
+  overflow: hidden scroll;
   /* background-image: linear-gradient(94deg, #5f0959, #12044b 51%, #08374b); */
   /* background: url('./assets/images/background.jpg') 50% / cover no-repeat; */
   background: url(https://www.99tech.co/assets/img/bg-product_lg.jpg) 50% /

@@ -55,7 +55,7 @@ const theme = extendTheme({
           // border: '3px solid linear-gradient(94deg,#a93eff,#5e40de 51%,#00b3ff)',
           // background: 'linear-gradient(#0e0e2a,#0e0e2a) padding-box,linear-gradient(90deg,#a93eff,#5e40de,#00b3ff) border-box;',
           "&.Mui-focused .MuiInputLabel-outlined": {
-            color: "yellow"
+            color: "#f5a623"
           },
           "&.Mui-focused .MuiOutlinedInput-root": {
             border: 'none',
